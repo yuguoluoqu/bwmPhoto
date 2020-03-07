@@ -3,7 +3,16 @@ package functions;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 public class ScreenShot {
@@ -24,19 +33,37 @@ public class ScreenShot {
             new File(src + "/screenshot").mkdir();
         }
 
-        for (File pic : files) {
+        for (int i = 0; i < files.length; i++) {
+            File pic = files[i];
             BufferedImage sourceImg = ImageIO.read(new FileInputStream(pic.getPath()));
 //            System.out.println(String.format("%.1f",picture.length()/1024.0));// 源图大小
             //3.recognize the screenshots
             if (recognize(sourceImg.getWidth(), sourceImg.getHeight())) {
                 //4.rename the files to the directory
-                pic.renameTo(new File(src + "/screenshot" + pic.getName()));
+                pic.renameTo(new File(src + "/screenshot" + getCreateTime(pic.getPath() + pic.getName()) + pic.getName()));
             }
 
 
         }
 
 
+    }
+
+    static SimpleDateFormat sdf = new SimpleDateFormat("YYYYmmDD");
+
+    private static String getCreateTime(String fullFileName) {
+        Path path = Paths.get(fullFileName);
+        BasicFileAttributeView basicview = Files.getFileAttributeView(path, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+        BasicFileAttributes attr;
+        try {
+            attr = basicview.readAttributes();
+            Date createDate = new Date(attr.creationTime().toMillis());
+            return sdf.format(createDate);
+        } catch (Exception e) {
+            e.printStackTrace();
+
+        }
+        return "";
     }
 
 //    {828+1792,750+1334};
