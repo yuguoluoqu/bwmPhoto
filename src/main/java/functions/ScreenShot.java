@@ -10,12 +10,11 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 
 public class ScreenShot {
+
 
     public static void screenShot(String src) throws IOException {
         //1.get the file list
@@ -24,7 +23,7 @@ public class ScreenShot {
             return;
         FileFilter filter = new FileFilter() {
             public boolean accept(File pathname) {
-                return pathname.isFile() && (pathname.getName().endsWith(".heic") || pathname.getName().endsWith(".png") || pathname.getName().endsWith(".jpg") || pathname.getName().endsWith(".jpeg"));
+                return pathname.isFile() && (pathname.getName().endsWith(".png") || pathname.getName().endsWith(".PNG"));
             }
         };
         File[] files = file.listFiles(filter);
@@ -33,23 +32,40 @@ public class ScreenShot {
             new File(src + "/screenshot").mkdir();
         }
 
-        for (int i = 0; i < files.length; i++) {
-            File pic = files[i];
-            BufferedImage sourceImg = ImageIO.read(new FileInputStream(pic.getPath()));
-//            System.out.println(String.format("%.1f",picture.length()/1024.0));// 源图大小
-            //3.recognize the screenshots
-            if (recognize(sourceImg.getWidth(), sourceImg.getHeight())) {
-                //4.rename the files to the directory
-                pic.renameTo(new File(src + "/screenshot" + getCreateTime(pic.getPath() + pic.getName()) + pic.getName()));
-            }
+        //move files to a queue
+        ArrayBlockingQueue<File> queue = new ArrayBlockingQueue(files.length);
+        queue.addAll(Arrays.asList(files));
 
+        for (int i = 0; i < 8; i++) {
+            new Thread(() -> {
+                System.out.println("thread " + Thread.currentThread() + "");
+                File pic = queue.poll();
+                while (pic != null) {
+                    System.out.println(pic.getName());
 
+                    try {
+                        FileInputStream fileStream = new FileInputStream(pic.getPath());
+                        BufferedImage  sourceImg = ImageIO.read(fileStream);
+                        //System.out.println(String.format("%.1f",picture.length()/1024.0));// 源图大小
+                        //3.recognize the screenshots
+                        if (recognize(sourceImg.getWidth(), sourceImg.getHeight())) {
+                            fileStream.close();
+                            //4.rename the files to the directory
+                            String dir = src + "\\screenshot\\" + getCreateTime(pic.getPath()) + pic.getName();
+                            while (!new File(dir).exists()) {
+                                pic.renameTo(new File(dir));
+                            }
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    pic = queue.poll();
+                }
+            }, "tread" + i).start();
         }
-
-
     }
 
-    static SimpleDateFormat sdf = new SimpleDateFormat("YYYYmmDD");
+    static SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
 
     private static String getCreateTime(String fullFileName) {
         Path path = Paths.get(fullFileName);
@@ -58,7 +74,12 @@ public class ScreenShot {
         try {
             attr = basicview.readAttributes();
             Date createDate = new Date(attr.creationTime().toMillis());
-            return sdf.format(createDate);
+            Date updateDate = new Date(attr.lastModifiedTime().toMillis());
+            if (createDate.before(updateDate)) {
+                return sdf.format(createDate);
+            } else {
+                return sdf.format(updateDate);
+            }
         } catch (Exception e) {
             e.printStackTrace();
 
@@ -71,7 +92,7 @@ public class ScreenShot {
     private static boolean recognize(int width, int height) {
 
         int size = width + height;
-        if (size == 828 + 1792 || size == 750 + 1334)
+        if (size == 828 + 1792 || size == 750 + 1334||size==640+1136)
             return true;
         return false;
     }
